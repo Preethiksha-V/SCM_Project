@@ -1,0 +1,231 @@
+```xml
+<!-- pom.xml -->
+<project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.ecommerce</groupId>
+    <artifactId>order-system</artifactId>
+    <version>1.0</version>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.0</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>Main</mainClass>
+                        </manifest>
+                    </archive>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>
+```
+
+```java
+// Product.java
+public class Product {
+    int id;
+    String name;
+    int stock;
+    double price;
+
+    public Product(int id, String name, int stock, double price) {
+        this.id = id;
+        this.name = name;
+        this.stock = stock;
+        this.price = price;
+    }
+}
+```
+
+```java
+// Inventory.java
+import java.util.ArrayList;
+
+public class Inventory {
+    ArrayList<Product> products = new ArrayList<>();
+
+    public void addProduct(Product p) {
+        products.add(p);
+    }
+
+    public Product getProduct(int id) {
+        for (Product p : products) {
+            if (p.id == id) return p;
+        }
+        return null;
+    }
+
+    public boolean reduceStock(int id, int qty) {
+        Product p = getProduct(id);
+        if (p != null && p.stock >= qty) {
+            p.stock = p.stock - qty;
+            return true;
+        }
+        return false;
+    }
+}
+```
+
+```java
+// PaymentService.java
+public class PaymentService {
+    public boolean processPayment(double amount) {
+        if (amount > 0) return true;
+        return false;
+    }
+}
+```
+
+```java
+// OrderService.java
+public class OrderService {
+    Inventory inventory;
+    PaymentService payment;
+
+    public OrderService(Inventory inventory, PaymentService payment) {
+        this.inventory = inventory;
+        this.payment = payment;
+    }
+
+    public String placeOrder(int productId, int qty) {
+        Product p = inventory.getProduct(productId);
+
+        if (p == null) return "Product not found";
+
+        if (!inventory.reduceStock(productId, qty)) {
+            return "Insufficient stock";
+        }
+
+        double total = p.price * qty;
+
+        if (!payment.processPayment(total)) {
+            return "Payment failed";
+        }
+
+        return "Order successful";
+    }
+}
+```
+
+```java
+// Main.java
+public class Main {
+    public static void main(String[] args) {
+        Inventory inv = new Inventory();
+        inv.addProduct(new Product(1, "Phone", 10, 1000));
+
+        OrderService os = new OrderService(inv, new PaymentService());
+
+        System.out.println(os.placeOrder(1, 2));
+    }
+}
+```
+
+```java
+// OrderServiceTest.java
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
+
+public class OrderServiceTest {
+
+    @Test
+    public void testOrderSuccess() {
+        Inventory inv = new Inventory();
+        inv.addProduct(new Product(1, "Phone", 10, 1000));
+
+        OrderService os = new OrderService(inv, new PaymentService());
+
+        String result = os.placeOrder(1, 2);
+        assertEquals("Order successful", result);
+    }
+
+    @Test
+    public void testInsufficientStock() {
+        Inventory inv = new Inventory();
+        inv.addProduct(new Product(1, "Phone", 1, 1000));
+
+        OrderService os = new OrderService(inv, new PaymentService());
+
+        String result = os.placeOrder(1, 5);
+        assertEquals("Insufficient stock", result);
+    }
+
+    @Test
+    public void testProductNotFound() {
+        Inventory inv = new Inventory();
+
+        OrderService os = new OrderService(inv, new PaymentService());
+
+        String result = os.placeOrder(99, 1);
+        assertEquals("Product not found", result);
+    }
+}
+```
+
+```groovy
+// Jenkinsfile
+pipeline {
+    agent any
+
+    stages {
+        stage('Clone') {
+            steps {
+                git 'https://github.com/your-repo/ecommerce-app.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean compile'
+            }
+        }
+
+        stage('Test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+
+        stage('Package') {
+            steps {
+                sh 'mvn package'
+            }
+        }
+
+        stage('Docker Build') {
+            steps {
+                sh 'docker build -t ecommerce-app .'
+            }
+        }
+
+        stage('Run') {
+            steps {
+                sh 'docker run -d -p 8080:8080 ecommerce-app'
+            }
+        }
+    }
+}
+```
+
+```dockerfile
+# Dockerfile
+FROM openjdk:17
+COPY target/order-system-1.0.jar app.jar
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+
